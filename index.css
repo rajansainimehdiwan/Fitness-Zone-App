@@ -1,0 +1,104 @@
+:root {
+  --bg: #09090b;
+  --card-bg: #18181b;
+  --blue: #3b82f6;
+  --text-muted: #71717a;
+  --orange: #f59e0b;
+  --red: #ef4444;
+}
+
+body {
+  background-color: var(--bg);
+  color: white;
+  font-family: 'Inter', system-ui, sans-serif;
+  display: flex; justify-content: center;
+  margin: 0; padding: 20px;
+}
+
+.container { width: 100%; max-width: 420px; }
+
+/* Timer */
+.timer-banner {
+  position: sticky; top: 10px; z-index: 100;
+  background: var(--orange); color: black;
+  padding: 12px 20px; border-radius: 12px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-weight: 800; margin-bottom: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+}
+.timer-content { display: flex; align-items: center; gap: 10px; }
+
+/* Branding */
+.header-brand { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 25px; }
+.icon-box { background: var(--blue); padding: 10px; border-radius: 12px; }
+
+/* Card UI */
+.card { background: var(--card-bg); padding: 24px; border-radius: 28px; border: 1px solid #27272a; position: relative; }
+.edit-indicator { background: var(--orange); color: black; font-size: 10px; font-weight: bold; position: absolute; top: -10px; right: 20px; padding: 4px 12px; border-radius: 20px; }
+
+.input-group label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-weight: bold; margin-bottom: 8px; }
+.add-link { color: var(--blue); cursor: pointer; }
+
+select {
+  width: 100%; background: black; border: 1px solid #27272a; color: white;
+  padding: 12px; border-radius: 12px; margin-bottom: 20px; font-size: 15px;
+}
+
+.row-flex { display: flex; gap: 10px; align-items: flex-start; }
+.copy-btn { background: #27272a; border: none; color: var(--blue); padding: 12px; border-radius: 12px; cursor: pointer; }
+
+/* FIXED GRID PREVENTS OVERLAPPING */
+.grid-header { display: grid; grid-template-columns: 50px 1fr 1fr 40px; gap: 10px; font-size: 10px; color: var(--text-muted); margin-bottom: 10px; text-align: center; }
+.grid-row { display: grid; grid-template-columns: 50px 1fr 1fr 40px; gap: 10px; align-items: center; margin-bottom: 12px; }
+.grid-row input { background: black; border: 1px solid #27272a; color: white; padding: 12px 5px; border-radius: 10px; text-align: center; width: 100%; font-size: 16px; }
+
+.s-label { color: var(--text-muted); font-weight: bold; text-align: center; }
+.ds-label { color: var(--orange); font-weight: bold; text-align: center; }
+.row-delete { color: #3f3f46; cursor: pointer; justify-self: center; }
+
+.actions-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 15px; margin-top: 20px; }
+.btn-secondary { background: #27272a; color: white; border: none; padding: 16px; border-radius: 14px; font-weight: bold; cursor: pointer; }
+.btn-primary { background: var(--blue); color: white; border: none; padding: 16px; border-radius: 14px; font-weight: bold; cursor: pointer; }
+
+/* History */
+.history-container { margin-top: 40px; }
+.history-container h3 { font-size: 14px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; margin-bottom: 15px; }
+.history-card { background: #111113; padding: 18px; border-radius: 20px; margin-bottom: 15px; border-left: 4px solid var(--blue); }
+.history-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.history-header p { font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0; }
+.history-btns { display: flex; gap: 12px; }
+.edit-icon { color: var(--text-muted); cursor: pointer; }
+.delete-icon { color: var(--text-muted); cursor: pointer; }
+.edit-icon:hover { color: var(--blue); }
+.delete-icon:hover { color: var(--red); }
+
+.set-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 15px; }
+.set-pills span { background: black; border: 1px solid #27272a; padding: 4px 10px; border-radius: 8px; font-size: 11px; color: var(--text-muted); }
+
+/* Date Selector Styling */
+.date-selector-card {
+  background: var(--card-bg);
+  padding: 12px 20px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  border: 1px solid #27272a;
+}
+
+.calendar-input {
+  background: transparent;
+  border: none;
+  color: white;
+  font-family: inherit;
+  font-size: 16px;
+  outline: none;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Specific to make the calendar icon in Chrome/Edge white */
+::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
