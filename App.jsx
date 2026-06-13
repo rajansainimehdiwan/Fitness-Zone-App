@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Dumbbell, Calendar as CalendarIcon, ChevronDown, Check, X, ChevronLeft, ChevronRight, Edit2, Trophy, Flame } from 'lucide-react';
+import { Plus, Trash2, Dumbbell, Calendar as CalendarIcon, ChevronDown, ChevronUp, Check, X, ChevronLeft, ChevronRight, Edit2, Trophy, Flame } from 'lucide-react';
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -22,7 +22,7 @@ export default function App() {
 
   // Core States
   const [library, setLibrary] = useState({});
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState([]); 
   const [customSplits, setCustomSplits] = useState({});
   const [selectedDate, setSelectedDate] = useState(todayMaxDate);
   const [selectedDay, setSelectedDay] = useState('');
@@ -36,17 +36,19 @@ export default function App() {
   const [isAddingExercise, setIsAddingExercise] = useState(false);
   const [newInput, setNewInput] = useState('');
 
+  // Collapsible Dropdown Toggle States
+  const [isPrExpanded, setIsPrExpanded] = useState(false);
+  const [isSplitStructureExpanded, setIsSplitStructureExpanded] = useState(false);
+
   // Calendar Modal States
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [currentViewDate, setCurrentViewDate] = useState(new Date());
 
   useEffect(() => {
     const savedLib = localStorage.getItem('fz_lib');
-    const savedLogs = localStorage.getItem('fz_logs');
     const savedSplits = localStorage.getItem('fz_splits');
     
     if (savedLib) setLibrary(JSON.parse(savedLib));
-    if (savedLogs) setHistory(JSON.parse(savedLogs));
     if (savedSplits) setCustomSplits(JSON.parse(savedSplits));
   }, []);
 
@@ -103,6 +105,8 @@ export default function App() {
       }
     };
     saveSplitsData(updatedSplits);
+    
+    setIsSplitStructureExpanded(true);
     handleDaySelect(selectedDay);
   };
 
@@ -128,43 +132,51 @@ export default function App() {
     }
   };
 
+  // RESTRICTS SELECTION: Clears existing skeleton placeholders if switching target day routines
   const handleDaySelect = (day) => {
     setSelectedDay(day);
-    if (!day) return;
+    if (!day) {
+      setHistory([]);
+      setIsSplitStructureExpanded(false);
+      return;
+    }
+
+    setIsSplitStructureExpanded(false);
+
+    const savedLogs = localStorage.getItem('fz_logs');
+    let dynamicHistoryBase = savedLogs ? JSON.parse(savedLogs) : [];
+
+    // STAGE 1: Filter out any existing template skeletons on this date from prior selected split days
+    dynamicHistoryBase = dynamicHistoryBase.filter(log => !(log.created_at === selectedDate && log.isSkeleton));
 
     const daySetup = customSplits[day];
-    if (!daySetup) return;
+    if (daySetup) {
+      daySetup.exercises.forEach(routineEx => {
+        // Only load if a saved log doesn't already exist for this explicit exercise on this date
+        const alreadyExists = dynamicHistoryBase.some(
+          log => log.created_at === selectedDate && log.exercise_name === routineEx.name
+        );
 
-    const updatedHistory = [...history];
-    let valuesAdded = false;
-
-    daySetup.exercises.forEach(routineEx => {
-      const alreadyExists = updatedHistory.some(
-        log => log.created_at === selectedDate && log.exercise_name === routineEx.name
-      );
-
-      if (!alreadyExists) {
-        const skeletonLog = {
-          id: crypto.randomUUID(),
-          body_part: routineEx.muscle,
-          exercise_name: routineEx.name,
-          sets_data: [
-            { reps: 0, weight: 0 }, { reps: 0, weight: 0 },
-            { reps: 0, weight: 0 }, { reps: 0, weight: 0 }
-          ],
-          created_at: selectedDate,
-          isSkeleton: true
-        };
-        updatedHistory.push(skeletonLog);
-        valuesAdded = true;
-      }
-    });
-
-    if (valuesAdded) {
-      saveLogs(updatedHistory);
+        if (!alreadyExists) {
+          const skeletonLog = {
+            id: crypto.randomUUID(),
+            body_part: routineEx.muscle,
+            exercise_name: routineEx.name,
+            sets_data: [
+              { reps: 0, weight: 0 }, { reps: 0, weight: 0 },
+              { reps: 0, weight: 0 }, { reps: 0, weight: 0 }
+            ],
+            created_at: selectedDate,
+            isSkeleton: true
+          };
+          dynamicHistoryBase.push(skeletonLog);
+        }
+      });
     }
     
-    if (daySetup.exercises.length > 0) {
+    setHistory(dynamicHistoryBase);
+
+    if (daySetup && daySetup.exercises.length > 0) {
       setSelectedBodyPart(daySetup.exercises[0].muscle);
       setSelectedExercise(daySetup.exercises[0].name);
     }
@@ -206,8 +218,11 @@ export default function App() {
   };
 
   const getPersonalRecords = () => {
+    const savedLogs = localStorage.getItem('fz_logs');
+    const globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
+    
     const prMap = {};
-    history.forEach(log => {
+    globalLogs.forEach(log => {
       if (log.isSkeleton) return;
       log.sets_data.forEach(set => {
         if (set.weight > (prMap[log.exercise_name] || 0)) {
@@ -244,6 +259,9 @@ export default function App() {
 
     setSelectedDate(targetStr);
     setShowCalendarModal(false);
+    
+    setSelectedDay('');
+    setHistory([]);
   };
 
   const changeMonth = (direction) => {
@@ -313,8 +331,8 @@ export default function App() {
           </div>
         </header>
 
-        {/* CUSTOM CALENDAR BUTTON MATCHED IN SIZE WITH LOWER ROUTINE MODULE FRAMES */}
-        <section style={{ width: '100%' }}>
+        {/* DATE PICKER BAR */}
+        <section style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
           <div 
             onClick={() => {
               const [sYear, sMonth] = selectedDate.split('-').map(Number);
@@ -328,9 +346,10 @@ export default function App() {
               gap: '10px', 
               backgroundColor: '#18181b', 
               border: '1px solid #27272a', 
-              padding: '14px', 
+              padding: '12px 24px', 
               borderRadius: '16px', 
               width: '100%',
+              maxWidth: '240px',
               cursor: 'pointer',
               fontWeight: '800',
               fontSize: '14px',
@@ -343,7 +362,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* WEEKLY TRAINING SPLIT DROPDOWN SECTION */}
+        {/* WEEKLY TRAINING SPLIT ROUTINE */}
         <section style={{ backgroundColor: '#18181b', border: '1px solid #27272a', padding: '16px', borderRadius: '24px', display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box', width: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#3b82f6', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase' }}>
@@ -368,40 +387,64 @@ export default function App() {
 
           {/* Render Routine Exercise Items */}
           {selectedDay && customSplits[selectedDay]?.exercises.length > 0 && (
-            <div style={{ backgroundColor: '#09090b', padding: '12px', borderRadius: '12px', border: '1px solid #27272a', display: 'flex', flexDirection: 'column', gap: '8px', boxSizing: 'border-box', width: '100%' }}>
-              <div style={{ fontSize: '10px', fontWeight: '800', color: '#a1a1aa', textTransform: 'uppercase' }}>
-                {selectedDay} Split Structure List:
-              </div>
-              {customSplits[selectedDay].exercises.map((ex, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#18181b', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(39, 39, 42, 0.4)', width: '100%', boxSizing: 'border-box' }}>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span style={{ fontSize: '9px', color: '#60a5fa', marginRight: '8px', textTransform: 'uppercase', fontWeight: '800' }}>[{ex.muscle}]</span>
-                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#f4f4f5', cursor: 'pointer' }} onClick={() => { setSelectedBodyPart(ex.muscle); setSelectedExercise(ex.name); }}>{ex.name}</span>
-                  </div>
-                  <button onClick={() => removeExerciseFromDay(ex.name)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
-                    <X size={14} />
-                  </button>
+            <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', width: '100%', boxSizing: 'border-box' }}>
+              <div 
+                onClick={() => setIsSplitStructureExpanded(!isSplitStructureExpanded)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#09090b', padding: '12px', borderRadius: isSplitStructureExpanded ? '16px 16px 0 0' : '16px', border: '1px solid #27272a', cursor: 'pointer', width: '100%', boxSizing: 'border-box' }}
+              >
+                <span style={{ fontSize: '11px', fontWeight: '900', color: '#a1a1aa', textTransform: 'uppercase', tracking: '0.05em' }}>
+                  {selectedDay.toUpperCase()} SPLIT STRUCTURE LIST ({customSplits[selectedDay].exercises.length})
+                </span>
+                <div style={{ color: '#71717a', display: 'flex', alignItems: 'center' }}>
+                  {isSplitStructureExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </div>
-              ))}
+              </div>
+
+              {isSplitStructureExpanded && (
+                <div style={{ backgroundColor: '#09090b', borderLeft: '1px solid #27272a', borderRight: '1px solid #27272a', borderBottom: '1px solid #27272a', padding: '12px', borderRadius: '0 0 16px 16px', display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', boxSizing: 'border-box' }}>
+                  {customSplits[selectedDay].exercises.map((ex, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#18181b', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(39, 39, 42, 0.4)', width: '100%', boxSizing: 'border-box' }}>
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#3b82f6', marginRight: '8px', textTransform: 'uppercase', fontWeight: '900' }}>[{ex.muscle}]</span>
+                        <span style={{ fontSize: '14px', fontWeight: '800', color: '#f4f4f5', cursor: 'pointer' }} onClick={() => { setSelectedBodyPart(ex.muscle); setSelectedExercise(ex.name); }}>{ex.name}</span>
+                      </div>
+                      <button onClick={() => removeExerciseFromDay(ex.name)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>
 
-        {/* PR CONSOLE OVERVIEW CONTAINER */}
+        {/* COLLAPSIBLE PERSONAL RECORDS DASHBOARD */}
         {Object.keys(prs).length > 0 && (
-          <section style={{ backgroundColor: '#18181b', border: '1px solid #27272a', padding: '20px', borderRadius: '24px', boxSizing: 'border-box', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontSize: '12px', fontWeight: '900', textTransform: 'uppercase', marginBottom: '12px' }}>
-              <Trophy size={16} />
-              <span>Personal Records Dashboard</span>
+          <section style={{ backgroundColor: '#18181b', border: '1px solid #27272a', padding: '16px 20px', borderRadius: '24px', boxSizing: 'border-box', width: '100%' }}>
+            <div 
+              onClick={() => setIsPrExpanded(!isPrExpanded)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', width: '100%' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontSize: '12px', fontWeight: '900', textTransform: 'uppercase' }}>
+                <Trophy size={16} />
+                <span>Personal Records Dashboard</span>
+              </div>
+              <div style={{ color: '#71717a', display: 'flex', alignItems: 'center' }}>
+                {isPrExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', width: '100%' }}>
-              {Object.entries(prs).map(([exercise, maxWeight]) => (
-                <div key={exercise} style={{ backgroundColor: '#09090b', border: '1px solid #27272a', padding: '12px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
-                  <span style={{ fontSize: '12px', color: '#a1a1aa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>{exercise}</span>
-                  <span style={{ fontSize: '16px', fontWeight: '900', color: '#ffffff' }}>{maxWeight}<span style={{ fontSize: '10px', color: '#f59e0b', marginLeft: '2px' }}>KG</span></span>
-                </div>
-              ))}
-            </div>
+
+            {isPrExpanded && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px', width: '100%', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid rgba(39, 39, 42, 0.4)' }}>
+                {Object.entries(prs).map(([exercise, maxWeight]) => (
+                  <div key={exercise} style={{ backgroundColor: '#09090b', border: '1px solid #27272a', padding: '12px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
+                    <span style={{ fontSize: '12px', color: '#a1a1aa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>{exercise}</span>
+                    <span style={{ fontSize: '16px', fontWeight: '900', color: '#ffffff' }}>{maxWeight}<span style={{ fontSize: '10px', color: '#f59e0b', marginLeft: '2px' }}>KG</span></span>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
 
@@ -460,7 +503,7 @@ export default function App() {
             )}
           </div>
 
-          {/* INPUT ROWS CONTAINER FOR REPS AND WEIGHTS */}
+          {/* INPUT ROWS FOR REPS AND WEIGHTS */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '8px', borderTop: '1px solid rgba(39, 39, 42, 0.6)', width: '100%' }}>
             <div style={{ display: 'flex', width: '100%', fontSize: '10px', fontWeight: '900', color: '#71717a', textTransform: 'uppercase', textAlign: 'center' }}>
               <div style={{ width: '15%', textAlign: 'left' }}>Set</div>
@@ -497,7 +540,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* LOG HISTORY MATRIX LIST GRID */}
+        {/* WORKOUT HISTORY AREA */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
           <h2 style={{ fontSize: '10px', fontWeight: '900', color: '#52525b', textTransform: 'uppercase', tracking: '0.1em', paddingLeft: '8px', borderLeft: '2px solid #2563eb', margin: 0 }}>Today's Workout History & Pre-loaded Split</h2>
           {filteredHistory.length === 0 ? (
@@ -544,7 +587,7 @@ export default function App() {
           )}
         </div>
 
-        {/* CUSTOM POPUP CALENDAR MODAL COMPONENT WINDOW */}
+        {/* CUSTOM POPUP CALENDAR MODAL COMPONENT */}
         {showCalendarModal && (
           <div style={{
             position: 'fixed',
