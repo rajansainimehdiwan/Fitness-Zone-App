@@ -44,7 +44,6 @@ export default function App() {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [currentViewDate, setCurrentViewDate] = useState(new Date());
 
-  // Initial mount: Load structural layouts and automatically pull saved history for today's date
   useEffect(() => {
     const savedLib = localStorage.getItem('fz_lib');
     const savedSplits = localStorage.getItem('fz_splits');
@@ -54,7 +53,6 @@ export default function App() {
     if (savedSplits) setCustomSplits(JSON.parse(savedSplits));
     if (savedLogs) {
       const allLogs = JSON.parse(savedLogs);
-      // Automatically pull and display saved logs matching today's active date
       const todaysSavedLogs = allLogs.filter(log => log.created_at === todayMaxDate);
       setHistory(todaysSavedLogs);
     }
@@ -66,7 +64,6 @@ export default function App() {
   };
 
   const saveLogs = (newLogs) => {
-    // Keeps state hook and physical database storage perfectly synchronized
     setHistory(newLogs);
     localStorage.setItem('fz_logs', JSON.stringify(newLogs));
   };
@@ -137,7 +134,6 @@ export default function App() {
       const savedLogs = localStorage.getItem('fz_logs');
       let globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
       
-      // Clean target skeletons out of both views safely
       globalLogs = globalLogs.filter(
         log => !(log.created_at === selectedDate && log.exercise_name === exerciseNameToRemove && log.isSkeleton)
       );
@@ -147,7 +143,6 @@ export default function App() {
     }
   };
 
-  // Loads templates side-by-side with historical records without overwriting saved sessions
   const handleDaySelect = (day) => {
     setSelectedDay(day);
     if (!day) {
@@ -163,7 +158,6 @@ export default function App() {
     const savedLogs = localStorage.getItem('fz_logs');
     let globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
 
-    // Filter out old empty skeletons for this target date so we don't duplicate empty inputs
     globalLogs = globalLogs.filter(log => !(log.created_at === selectedDate && log.isSkeleton));
 
     const daySetup = customSplits[day];
@@ -190,7 +184,6 @@ export default function App() {
       });
     }
     
-    // Save updated skeleton track layout back into context maps
     localStorage.setItem('fz_logs', JSON.stringify(globalLogs));
     setHistory(globalLogs.filter(log => log.created_at === selectedDate));
 
@@ -200,25 +193,6 @@ export default function App() {
     }
   };
 
-  // Inline logging inputs change handler: auto commits to global localStorage arrays
-  const handleInlineSetChange = (logId, setIndex, field, value) => {
-    const savedLogs = localStorage.getItem('fz_logs');
-    let globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
-
-    globalLogs = globalLogs.map(log => {
-      if (log.id === logId) {
-        const newSets = [...log.sets_data];
-        newSets[setIndex] = { ...newSets[setIndex], [field]: Number(value) };
-        return { ...log, sets_data: newSets, isSkeleton: false };
-      }
-      return log;
-    });
-
-    localStorage.setItem('fz_logs', JSON.stringify(globalLogs));
-    setHistory(globalLogs.filter(log => log.created_at === selectedDate));
-  };
-
-  // Fixed top panel commit engine: safely merges logs into persistent local arrays
   const handleSave = () => {
     if (!selectedExercise) return alert("Select an exercise!");
     
@@ -239,7 +213,6 @@ export default function App() {
       }
     }
 
-    // Explicitly update database array permanently
     localStorage.setItem('fz_logs', JSON.stringify(globalLogs));
     setHistory(globalLogs.filter(log => log.created_at === selectedDate));
 
@@ -291,7 +264,6 @@ export default function App() {
     setShowCalendarModal(false);
     setSelectedDay('');
 
-    // Automatically fetch and load any saved logs for this calendar date selection
     const savedLogs = localStorage.getItem('fz_logs');
     const globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
     setHistory(globalLogs.filter(log => log.created_at === targetStr));
@@ -481,7 +453,7 @@ export default function App() {
           </section>
         )}
 
-        {/* INPUT LOGGING ENGINE RIG */}
+        {/* MAIN INPUT LOGGING CONSOLE CONTAINER */}
         <section style={{ backgroundColor: '#18181b', border: '1px solid #27272a', padding: '24px', borderRadius: '24px', display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box', width: '100%' }}>
           
           {/* Muscle dropdown block */}
@@ -573,7 +545,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* WORKOUT HISTORY AREA (NOW AUTO-PULLS SAVED ENTRIES ON APP LOAD) */}
+        {/* WORKOUT HISTORY AREA (LOCKED TO READ-ONLY STATUS FIELDS) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
           <h2 style={{ fontSize: '10px', fontWeight: '900', color: '#52525b', textTransform: 'uppercase', tracking: '0.1em', paddingLeft: '8px', borderLeft: '2px solid #2563eb', margin: 0 }}>Today's Workout History & Pre-loaded Split</h2>
           {filteredHistory.length === 0 ? (
@@ -594,24 +566,17 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Grid matrix displays read-only status metrics to protect against data override errors */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', width: '100%' }}>
                   {log.sets_data.map((s, i) => (
                     <div key={i} style={{ backgroundColor: '#09090b', border: '1px solid #27272a', padding: '6px', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', boxSizing: 'border-box' }}>
                       <span style={{ fontWeight: '900', fontSize: '9px', color: i >= 3 ? '#f59e0b' : '#52525b' }}>{getLabel(i)}</span>
-                      <input 
-                        type="number" 
-                        placeholder="Reps" 
-                        value={s.reps || ''} 
-                        onChange={e => handleInlineSetChange(log.id, i, 'reps', e.target.value)}
-                        style={{ width: '100%', backgroundColor: '#18181b', border: 'none', padding: '4px 0', color: '#ffffff', fontSize: '13px', textAlign: 'center', outline: 'none', fontWeight: '700' }} 
-                      />
-                      <input 
-                        type="number" 
-                        placeholder="kg" 
-                        value={s.weight || ''} 
-                        onChange={e => handleInlineSetChange(log.id, i, 'weight', e.target.value)}
-                        style={{ width: '100%', backgroundColor: '#18181b', border: 'none', padding: '4px 0', color: '#3b82f6', fontSize: '13px', textAlign: 'center', outline: 'none', fontWeight: '900' }} 
-                      />
+                      <div style={{ width: '100%', backgroundColor: '#18181b', padding: '4px 0', color: s.reps ? '#ffffff' : '#3f3f46', fontSize: '13px', textAlign: 'center', fontWeight: '700', borderRadius: '6px' }}>
+                        {s.reps || 'Reps'}
+                      </div>
+                      <div style={{ width: '100%', backgroundColor: '#18181b', padding: '4px 0', color: s.weight ? '#3b82f6' : '#3f3f46', fontSize: '13px', textAlign: 'center', fontWeight: '900', borderRadius: '6px' }}>
+                        {s.weight ? `${s.weight} kg` : 'kg'}
+                      </div>
                     </div>
                   ))}
                 </div>
