@@ -44,12 +44,20 @@ export default function App() {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [currentViewDate, setCurrentViewDate] = useState(new Date());
 
+  // Initial mount: Load structural layouts and automatically pull saved history for today's date
   useEffect(() => {
     const savedLib = localStorage.getItem('fz_lib');
     const savedSplits = localStorage.getItem('fz_splits');
+    const savedLogs = localStorage.getItem('fz_logs');
     
     if (savedLib) setLibrary(JSON.parse(savedLib));
     if (savedSplits) setCustomSplits(JSON.parse(savedSplits));
+    if (savedLogs) {
+      const allLogs = JSON.parse(savedLogs);
+      // Automatically pull and display saved logs matching today's active date
+      const todaysSavedLogs = allLogs.filter(log => log.created_at === todayMaxDate);
+      setHistory(todaysSavedLogs);
+    }
   }, []);
 
   const saveLibrary = (newLib) => {
@@ -58,6 +66,7 @@ export default function App() {
   };
 
   const saveLogs = (newLogs) => {
+    // Keeps state hook and physical database storage perfectly synchronized
     setHistory(newLogs);
     localStorage.setItem('fz_logs', JSON.stringify(newLogs));
   };
@@ -125,18 +134,26 @@ export default function App() {
 
       saveSplitsData(updatedSplits);
       
-      const cleanedHistory = history.filter(
+      const savedLogs = localStorage.getItem('fz_logs');
+      let globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
+      
+      // Clean target skeletons out of both views safely
+      globalLogs = globalLogs.filter(
         log => !(log.created_at === selectedDate && log.exercise_name === exerciseNameToRemove && log.isSkeleton)
       );
-      saveLogs(cleanedHistory);
+      
+      localStorage.setItem('fz_logs', JSON.stringify(globalLogs));
+      setHistory(globalLogs.filter(log => log.created_at === selectedDate));
     }
   };
 
-  // RESTRICTS SELECTION: Clears existing skeleton placeholders if switching target day routines
+  // Loads templates side-by-side with historical records without overwriting saved sessions
   const handleDaySelect = (day) => {
     setSelectedDay(day);
     if (!day) {
-      setHistory([]);
+      const savedLogs = localStorage.getItem('fz_logs');
+      const globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
+      setHistory(globalLogs.filter(log => log.created_at === selectedDate));
       setIsSplitStructureExpanded(false);
       return;
     }
@@ -144,16 +161,15 @@ export default function App() {
     setIsSplitStructureExpanded(false);
 
     const savedLogs = localStorage.getItem('fz_logs');
-    let dynamicHistoryBase = savedLogs ? JSON.parse(savedLogs) : [];
+    let globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
 
-    // STAGE 1: Filter out any existing template skeletons on this date from prior selected split days
-    dynamicHistoryBase = dynamicHistoryBase.filter(log => !(log.created_at === selectedDate && log.isSkeleton));
+    // Filter out old empty skeletons for this target date so we don't duplicate empty inputs
+    globalLogs = globalLogs.filter(log => !(log.created_at === selectedDate && log.isSkeleton));
 
     const daySetup = customSplits[day];
     if (daySetup) {
       daySetup.exercises.forEach(routineEx => {
-        // Only load if a saved log doesn't already exist for this explicit exercise on this date
-        const alreadyExists = dynamicHistoryBase.some(
+        const alreadyExists = globalLogs.some(
           log => log.created_at === selectedDate && log.exercise_name === routineEx.name
         );
 
@@ -169,12 +185,14 @@ export default function App() {
             created_at: selectedDate,
             isSkeleton: true
           };
-          dynamicHistoryBase.push(skeletonLog);
+          globalLogs.push(skeletonLog);
         }
       });
     }
     
-    setHistory(dynamicHistoryBase);
+    // Save updated skeleton track layout back into context maps
+    localStorage.setItem('fz_logs', JSON.stringify(globalLogs));
+    setHistory(globalLogs.filter(log => log.created_at === selectedDate));
 
     if (daySetup && daySetup.exercises.length > 0) {
       setSelectedBodyPart(daySetup.exercises[0].muscle);
@@ -182,8 +200,12 @@ export default function App() {
     }
   };
 
+  // Inline logging inputs change handler: auto commits to global localStorage arrays
   const handleInlineSetChange = (logId, setIndex, field, value) => {
-    const updatedHistory = history.map(log => {
+    const savedLogs = localStorage.getItem('fz_logs');
+    let globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
+
+    globalLogs = globalLogs.map(log => {
       if (log.id === logId) {
         const newSets = [...log.sets_data];
         newSets[setIndex] = { ...newSets[setIndex], [field]: Number(value) };
@@ -191,28 +213,36 @@ export default function App() {
       }
       return log;
     });
-    saveLogs(updatedHistory);
+
+    localStorage.setItem('fz_logs', JSON.stringify(globalLogs));
+    setHistory(globalLogs.filter(log => log.created_at === selectedDate));
   };
 
+  // Fixed top panel commit engine: safely merges logs into persistent local arrays
   const handleSave = () => {
     if (!selectedExercise) return alert("Select an exercise!");
     
+    const savedLogs = localStorage.getItem('fz_logs');
+    let globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
+
     if (editingId) {
-      const updated = history.map(log => log.id === editingId ? { ...log, body_part: selectedBodyPart, exercise_name: selectedExercise, sets_data: sets, isSkeleton: false } : log);
-      saveLogs(updated);
+      globalLogs = globalLogs.map(log => log.id === editingId ? { ...log, body_part: selectedBodyPart, exercise_name: selectedExercise, sets_data: sets, isSkeleton: false } : log);
       setEditingId(null);
     } else {
-      const existingIdx = history.findIndex(log => log.created_at === selectedDate && log.exercise_name === selectedExercise);
+      const existingIdx = globalLogs.findIndex(log => log.created_at === selectedDate && log.exercise_name === selectedExercise);
       
       if (existingIdx !== -1) {
-        const updated = [...history];
-        updated[existingIdx] = { ...updated[existingIdx], sets_data: sets, isSkeleton: false };
-        saveLogs(updated);
+        globalLogs[existingIdx] = { ...globalLogs[existingIdx], body_part: selectedBodyPart, sets_data: sets, isSkeleton: false };
       } else {
         const entry = { id: crypto.randomUUID(), body_part: selectedBodyPart, exercise_name: selectedExercise, sets_data: sets, created_at: selectedDate, isSkeleton: false };
-        saveLogs([entry, ...history]);
+        globalLogs = [entry, ...globalLogs];
       }
     }
+
+    // Explicitly update database array permanently
+    localStorage.setItem('fz_logs', JSON.stringify(globalLogs));
+    setHistory(globalLogs.filter(log => log.created_at === selectedDate));
+
     setSets(initialSets);
     setSelectedExercise('');
   };
@@ -259,9 +289,12 @@ export default function App() {
 
     setSelectedDate(targetStr);
     setShowCalendarModal(false);
-    
     setSelectedDay('');
-    setHistory([]);
+
+    // Automatically fetch and load any saved logs for this calendar date selection
+    const savedLogs = localStorage.getItem('fz_logs');
+    const globalLogs = savedLogs ? JSON.parse(savedLogs) : [];
+    setHistory(globalLogs.filter(log => log.created_at === targetStr));
   };
 
   const changeMonth = (direction) => {
@@ -540,7 +573,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* WORKOUT HISTORY AREA */}
+        {/* WORKOUT HISTORY AREA (NOW AUTO-PULLS SAVED ENTRIES ON APP LOAD) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
           <h2 style={{ fontSize: '10px', fontWeight: '900', color: '#52525b', textTransform: 'uppercase', tracking: '0.1em', paddingLeft: '8px', borderLeft: '2px solid #2563eb', margin: 0 }}>Today's Workout History & Pre-loaded Split</h2>
           {filteredHistory.length === 0 ? (
@@ -557,7 +590,7 @@ export default function App() {
                   </div>
                   <div style={{ display: 'flex', gap: '2px' }}>
                     <button onClick={() => { setEditingId(log.id); setSelectedBodyPart(log.body_part); setSelectedExercise(log.exercise_name); setSets(log.sets_data); window.scrollTo({top:0, behavior:'smooth'}); }} style={{ padding: '8px', color: '#52525b', background: 'none', border: 'none', cursor: 'pointer' }}><Edit2 size={15}/></button>
-                    <button onClick={() => { if(confirm("Are you sure you want to delete this log?")) { saveLogs(history.filter(h => h.id !== log.id)); } }} style={{ padding: '8px', color: '#52525b', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={15}/></button>
+                    <button onClick={() => { if(confirm("Are you sure you want to delete this log?")) { const savedLogs = localStorage.getItem('fz_logs'); const globalLogs = savedLogs ? JSON.parse(savedLogs) : []; const updated = globalLogs.filter(h => h.id !== log.id); saveLogs(updated); setHistory(updated.filter(h => h.created_at === selectedDate)); } }} style={{ padding: '8px', color: '#52525b', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={15}/></button>
                   </div>
                 </div>
 
@@ -666,7 +699,7 @@ export default function App() {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', padding: '12px 20px', borderTop: '1px solid #2c2c2e' }}>
                 <button onClick={() => setShowCalendarModal(false)} style={{ background: 'none', border: 'none', color: '#60a5fa', fontWeight: '800', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
-                <button onClick={() => { setSelectedDate(todayMaxDate); setShowCalendarModal(false); }} style={{ background: 'none', border: 'none', color: '#60a5fa', fontWeight: '800', fontSize: '13px', cursor: 'pointer' }}>Today</button>
+                <button onClick={() => { setSelectedDate(todayMaxDate); setShowCalendarModal(false); setSelectedDay(''); const savedLogs = localStorage.getItem('fz_logs'); const globalLogs = savedLogs ? JSON.parse(savedLogs) : []; setHistory(globalLogs.filter(h => h.created_at === todayMaxDate)); }} style={{ background: 'none', border: 'none', color: '#60a5fa', fontWeight: '800', fontSize: '13px', cursor: 'pointer' }}>Today</button>
               </div>
 
             </div>
