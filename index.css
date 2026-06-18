@@ -1,3 +1,4 @@
+
 :root {
   --bg: #09090b;
   --card-bg: #18181b;
@@ -101,4 +102,42 @@ select {
 ::-webkit-calendar-picker-indicator {
   filter: invert(1);
   cursor: pointer;
+}
+
+.history-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.download-btn {
+  background: #27272a;
+  border: none;
+  color: var(--blue);
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.download-btn:hover {
+  background: #3f3f46;
+}
+
+.label-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.del-link {
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.del-link:hover {
+  color: var(--red);
 }
